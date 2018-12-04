@@ -12,6 +12,7 @@ typedef struct line
 {
     char *str;
     size_t len;
+    uint64_t bits[3];
 } line_t;
 
 typedef struct file_lines
@@ -27,6 +28,18 @@ typedef struct file_lines
 #define ERR(__msg, ...) do { fprintf(stderr, "[X] " __msg "\n", ## __VA_ARGS__); } while (0)
 
 #define VALIDATE_PTR_OR_RETURN(__ptr, __retval) if (0 == (__ptr)) { ERR(# __ptr "is NULL!"); return (__retval); }
+
+int line_cmp(void *a, void *b) 
+{
+    line_t *l1 = *(line_t **)a;
+    line_t *l2 = *(line_t **)b;
+    return strcmp(l1->str, l2->str);
+}
+
+void file_sort_lines(file_lines_t *lines)
+{
+    qsort(lines->lines, lines->nlines, sizeof(lines->lines[0]), line_cmp);
+}
 
 line_t *file_next_line(FILE *fp) {
     ssize_t bytes_read = 0;
@@ -57,7 +70,7 @@ file_lines_t *file_get_lines(const char *filename)
     file_lines_t *lines = calloc(1, sizeof(*lines));
     VALIDATE_PTR_OR_RETURN(lines, NULL);
     lines->capacity = FILE_LINES_INITIAL_CAPACITY;
-    lines->lines = calloc(lines->capacity, sizeof(line_t));
+    lines->lines = calloc(lines->capacity, sizeof(line_t *));
 
     line_t *line = NULL;
     while ((line = file_next_line(fp)) != NULL) {
@@ -94,35 +107,48 @@ long *file_lines_get_as_numbers(file_lines_t *lines)
 void count_letters(line_t *line, bool *counts2, bool *counts3)
 {
     unsigned long num2s = 0, num3s=0;
-    unsigned long vals[26];
+    unsigned long char_counts[26] = {0};
     for (size_t i = 0; i < line->len; ++i) {
         int index = line->str[i] - 'a';
-        unsigned long oldval = vals[index];
-        unsigned long newval = vals[index] + 1;
-        if (oldval == 2 && newval > 2) {
+        unsigned long oldcnt = char_counts[index];
+        unsigned long newcnt = char_counts[index] + 1;
+        if (oldcnt == 2 && newcnt > 2) {
             num2s--;
-        } else if (oldval == 3 && newval > 3) {
+        } else if (oldcnt == 3 && newcnt > 3) {
             num3s--;
-        } else if (newval == 2) {
-            printf("2: %s: %c\n", line->str, line->str[i]);
+        } 
+        
+        if (newcnt == 2) {
             num2s++;
-        } else if (newval == 3) {
-            printf("3: %s: %c\n", line->str, line->str[i]);
+        } else if (newcnt == 3) {
             num3s++;
         }
 
-        vals[index] = newval;
+        char_counts[index] = newcnt;
     }
 
     if (num2s > 0) {
-        printf("%s has a letter that occurs twice\n", line->str);
         *counts2 = true;
     }
 
     if (num3s > 0) {
-        printf("%s has a letter that occurs three times\n", line->str);
         *counts3 = true;
     }
+}
+
+int hamming_distance(line_t *l1, line_t *l2, char *outstr)
+{
+    int hd = 0;
+    int out_index = 0;
+    for (size_t i = 0; i < l1->len; ++i) {
+        if (l1->str[i] != l2->str[i]) {
+            hd++;
+        } else {
+            outstr[out_index++] = l1->str[i];
+        }
+    }
+
+    return hd;
 }
 
 int main(int argc, char *argv[])
@@ -152,4 +178,19 @@ int main(int argc, char *argv[])
 
     printf("result: (%lu * %lu) =  %lu\n", num2s, num3s, (num2s * num3s));
 
+    char outstr[lines->lines[0]->len];
+    for (uint32_t i = 0; i < lines->nlines; ++i) {
+        line_t *l1 = file_lines_get_line(lines, i);
+        for (uint32_t j = 0; j < lines->nlines; ++j) {
+            if (j != i) {
+                line_t *l2 = file_lines_get_line(lines, j);
+                memset(outstr, 0, lines->lines[0]->len);
+                int hd = hamming_distance(l1, l2, outstr);
+                if (hd == 1) {
+                    printf("%s\n", outstr);
+                    return 0;
+                }
+            }
+        }
+    }
 }
