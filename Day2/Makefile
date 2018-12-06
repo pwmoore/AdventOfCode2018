@@ -1,8 +1,10 @@
 BIN=Day2
 GLIBFLAGS=-I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -lglib-2.0
+LIB=../lib/file.c
+LIBINC=-I ../lib
 
-$(BIN): $(BIN).c
-	cc $^ -lbsd -o $@
+$(BIN): $(LIB) $(BIN).c
+	cc $^ $(LIBINC) -lbsd -o $@
 
 .PHONY: clean
 clean:

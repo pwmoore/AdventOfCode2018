@@ -5,104 +5,8 @@
 #include <stdbool.h>
 #include <bsd/stdlib.h>
 
-#define COUNTER_OCCURRENCES(__ctr) ((__ctr) & 127)
-#define COUNTER_COUNTS(__ctr) ((__ctr) & 128)
-
-typedef struct line
-{
-    char *str;
-    size_t len;
-    uint64_t bits[3];
-} line_t;
-
-typedef struct file_lines
-{
-    size_t nlines;
-    size_t capacity;
-    line_t **lines;
-} file_lines_t;
-
-#define FILE_LINES_INITIAL_CAPACITY (1000)
-
-#define DIE_IF(__cond, __msg, ...) if (__cond) { fprintf(stderr, "[X] " __msg "\n", ## __VA_ARGS__); exit(EXIT_FAILURE); }
-#define ERR(__msg, ...) do { fprintf(stderr, "[X] " __msg "\n", ## __VA_ARGS__); } while (0)
-
-#define VALIDATE_PTR_OR_RETURN(__ptr, __retval) if (0 == (__ptr)) { ERR(# __ptr "is NULL!"); return (__retval); }
-
-int line_cmp(void *a, void *b) 
-{
-    line_t *l1 = *(line_t **)a;
-    line_t *l2 = *(line_t **)b;
-    return strcmp(l1->str, l2->str);
-}
-
-void file_sort_lines(file_lines_t *lines)
-{
-    qsort(lines->lines, lines->nlines, sizeof(lines->lines[0]), line_cmp);
-}
-
-line_t *file_next_line(FILE *fp) {
-    ssize_t bytes_read = 0;
-    char *str = NULL;
-    size_t len = 0;
-    bytes_read = getline(&str, &len, fp);
-    if (bytes_read < 0) {
-        return NULL;
-    }
-
-    len = strlen(str);
-    if (str[len - 1] == '\n') {
-        str[len - 1] = '\0';
-        len -= 1;
-    }
-
-    line_t *line = calloc(1, sizeof(*line));
-    line->str = str;
-    line->len = len;
-    return line;
-}
-
-file_lines_t *file_get_lines(const char *filename)
-{
-    FILE *fp = fopen(filename, "r");
-    VALIDATE_PTR_OR_RETURN(fp, NULL);
-
-    file_lines_t *lines = calloc(1, sizeof(*lines));
-    VALIDATE_PTR_OR_RETURN(lines, NULL);
-    lines->capacity = FILE_LINES_INITIAL_CAPACITY;
-    lines->lines = calloc(lines->capacity, sizeof(line_t *));
-
-    line_t *line = NULL;
-    while ((line = file_next_line(fp)) != NULL) {
-        if (lines->nlines == lines->capacity) {
-            size_t new_capacity = 2 * lines->capacity;
-            lines->lines = realloc(lines->lines, new_capacity);
-            lines->capacity = new_capacity;
-        }
-        lines->lines[lines->nlines++] = line;
-    }
-
-    fclose(fp);
-    return lines;
-}
-
-line_t *file_lines_get_line(file_lines_t *lines, uint32_t lineno)
-{
-    if (lineno >= lines->nlines) {
-        return NULL;
-    } else {
-        return lines->lines[lineno];
-    }
-}
-
-long *file_lines_get_as_numbers(file_lines_t *lines)
-{
-    long *vals = calloc(lines->nlines, sizeof(long));
-    for (size_t i = 0; i < lines->nlines; ++i) {
-        vals[i] = strtol(lines->lines[i]->str, NULL, 0);
-    }
-    return vals;
-}
+#include "file.h"
+#include "utils.h"
 
 void count_letters(line_t *line, bool *counts2, bool *counts3)
 {
@@ -158,13 +62,13 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    file_lines_t *lines = file_get_lines(argv[1]);
-    DIE_IF((lines == NULL), "Could not read lines from %s\n", argv[1]);
+    file_t *file = file_get_lines(argv[1], NULL, NULL);
+    DIE_IF((file == NULL), "Could not read lines from %s\n", argv[1]);
 
     uint64_t num2s = 0, num3s = 0;
     line_t *line = NULL;
-    for (uint32_t i = 0; i < lines->nlines; ++i) {
-        line = file_lines_get_line(lines, i);
+    for (uint32_t i = 0; i < file_line_count(file); ++i) {
+        line = file_get_line(file, i);
         bool count2 = false, count3 = false;
         count_letters(line, &count2, &count3);
         if (count2) {
@@ -178,19 +82,24 @@ int main(int argc, char *argv[])
 
     printf("result: (%lu * %lu) =  %lu\n", num2s, num3s, (num2s * num3s));
 
-    char outstr[lines->lines[0]->len];
-    for (uint32_t i = 0; i < lines->nlines; ++i) {
-        line_t *l1 = file_lines_get_line(lines, i);
-        for (uint32_t j = 0; j < lines->nlines; ++j) {
+    size_t line_size = line_length(file_get_line(file, 0));
+    char outstr[line_size];
+    for (uint32_t i = 0; i < file_line_count(file); ++i) {
+        line_t *l1 = file_get_line(file, i);
+        for (uint32_t j = 0; j < file_line_count(file); ++j) {
             if (j != i) {
-                line_t *l2 = file_lines_get_line(lines, j);
-                memset(outstr, 0, lines->lines[0]->len);
+                line_t *l2 = file_get_line(file, j);
+                memset(outstr, 0, line_size);
                 int hd = hamming_distance(l1, l2, outstr);
                 if (hd == 1) {
                     printf("%s\n", outstr);
+                    goto out;
                     return 0;
                 }
             }
         }
     }
+
+out:
+    file_free(file);
 }
