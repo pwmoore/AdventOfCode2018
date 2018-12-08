@@ -15,7 +15,7 @@ int line_cmp(const void *a, const void *b)
 
 void file_sort_lines(file_t *file)
 {
-    qsort(file->lines, file->nlines, sizeof(file->lines[0]), line_cmp);
+    qsort(file->lines, file->nlines, sizeof(file->lines[0]), file->sort_callback);
 }
 
 line_t *file_next_line(FILE *fp) {
@@ -47,7 +47,7 @@ void file_line_free(line_t *line)
     }
 }
 
-file_t *file_get_lines(const char *filename, line_transform_t transform_callback, line_data_free_t free_callback)
+file_t *file_get_lines(const char *filename, line_transform_t transform_callback, line_data_free_t free_callback, line_sort_t sort_callback)
 {
     FILE *fp = fopen(filename, "r");
     VALIDATE_PTR_OR_RETURN(fp, NULL);
@@ -74,6 +74,12 @@ file_t *file_get_lines(const char *filename, line_transform_t transform_callback
 
     if (free_callback) {
         file->free_callback = free_callback;
+    }
+
+    if (sort_callback) {
+        file->sort_callback = sort_callback;
+    } else {
+        file->sort_callback = line_cmp;
     }
 
     fclose(fp);

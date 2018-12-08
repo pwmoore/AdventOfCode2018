@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    file_t *file = file_get_lines(argv[1], NULL, NULL);
+    file_t *file = file_get_lines(argv[1], NULL, NULL, NULL);
     DIE_IF((file == NULL), "Could not read lines from %s\n", argv[1]);
 
     uint64_t num2s = 0, num3s = 0;

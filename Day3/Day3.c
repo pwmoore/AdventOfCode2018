@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    file_t *file = file_get_lines(argv[1], parse_claim, free_claim);
+    file_t *file = file_get_lines(argv[1], parse_claim, free_claim, NULL);
     DIE_IF((file == NULL), "Could not read lines from %s\n", argv[1]);
 
     int furthest_x = 0;

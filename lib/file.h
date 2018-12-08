@@ -14,6 +14,7 @@ typedef struct line
 
 typedef bool (*line_transform_t)(line_t *line);
 typedef void (*line_data_free_t)(line_t *line);
+typedef int (*line_sort_t)(const void *a, const void *b);
 
 typedef struct file
 {
@@ -21,6 +22,7 @@ typedef struct file
     size_t nlines;
     size_t capacity;
     line_t **lines;
+    line_sort_t sort_callback;
     line_data_free_t free_callback;
 } file_t;
 
@@ -60,7 +62,7 @@ static inline size_t file_total_capacity(file_t *file)
 }
 
 void file_sort_lines(file_t *lines);
-file_t *file_get_lines(const char *filename, line_transform_t transform_callback, line_data_free_t free_callback);
+file_t *file_get_lines(const char *filename, line_transform_t transform_callback, line_data_free_t free_callback, line_sort_t sort_callback);
 line_t *file_get_line(file_t *file, uint32_t lineno);
 long *file_get_as_numbers(file_t *lines);
 void file_free(file_t *file);
