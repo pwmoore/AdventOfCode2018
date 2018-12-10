@@ -1,7 +1,10 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
 #include "utils.h"
 #include "file.h"
@@ -98,6 +101,9 @@ void file_free(file_t *file)
                 file_line_free(line);
             }
         }
+        if (file->contents) {
+            free(file->contents);
+        }
         free(file->lines);
         free(file);
     }
@@ -119,4 +125,54 @@ long *file_lines_get_as_numbers(file_t *file)
         vals[i] = strtol(file->lines[i]->str, NULL, 0);
     }
     return vals;
+}
+
+int file_get_size(const char *filename, size_t *size)
+{
+    struct stat sb;
+    if (stat(filename, &sb)) {
+        return -1;
+    }
+
+    *size = sb.st_size;
+    return 0;
+}
+
+file_t *file_open(const char *filename)
+{
+    file_t *file = calloc(1, sizeof(file_t));
+    FILE *fp = NULL;
+    int err = file_get_size(filename, &file->size);
+    if (err) {
+        goto out;
+    }
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        err = -1;
+        goto out;
+    }
+
+    file->contents = calloc(1, file->size);
+
+    if (file->contents == NULL) {
+        err = -1;
+        goto out;
+    }
+
+    if (fread(file->contents, 1, file->size, fp) != file->size) {
+        err = -1;
+        goto out;
+    }
+
+    err = 0;
+
+out:
+    if (err) {
+        file_free(file);
+        file = NULL;
+    }
+    fclose(fp);
+
+    return file;
 }

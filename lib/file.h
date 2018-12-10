@@ -18,7 +18,8 @@ typedef int (*line_sort_t)(const void *a, const void *b);
 
 typedef struct file
 {
-    void *mapped_file;
+    char *contents;
+    size_t size;
     size_t nlines;
     size_t capacity;
     line_t **lines;
@@ -61,11 +62,22 @@ static inline size_t file_total_capacity(file_t *file)
     return file->capacity;
 }
 
+static inline size_t file_size(file_t *file)
+{
+    return file->size;
+}
+
+static inline char *file_contents(file_t *file)
+{
+    return file->contents;
+}
+
 void file_sort_lines(file_t *lines);
 file_t *file_get_lines(const char *filename, line_transform_t transform_callback, line_data_free_t free_callback, line_sort_t sort_callback);
 line_t *file_get_line(file_t *file, uint32_t lineno);
 long *file_get_as_numbers(file_t *lines);
 void file_free(file_t *file);
+file_t *file_open(const char *filename);
 
 #ifdef __cplusplus
 }
