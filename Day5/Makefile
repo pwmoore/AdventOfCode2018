@@ -4,7 +4,7 @@ LIB=../lib/file.c
 LIBINC=-I ../lib
 
 $(BIN): $(LIB) $(BIN).c
-	cc -O3 $^ $(LIBINC) -lbsd -o $@
+	cc -O3 $^ $(LIBINC) -lpthread -lbsd -o $@
 
 .PHONY: clean
 clean:

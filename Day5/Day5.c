@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include <bsd/stdlib.h>
 
 #include "file.h"
@@ -130,6 +131,12 @@ static inline void polymer_remove(polymer_t *polymer, char c)
     //polymer_print(polymer);
 }
 
+struct args {
+    char c;
+    char *buf;
+    size_t size;
+};
+
 void polymer_destroy(polymer_t *polymer)
 {
 #if 0
@@ -139,6 +146,21 @@ void polymer_destroy(polymer_t *polymer)
 #endif
     polymer->units[polymer->current] = '\0';
     polymer->units[polymer->next] = '\0';
+}
+
+void *find_size_thread(void *args)
+{
+    struct args *a = args;
+    polymer_t *p = polymer_create(a->buf, a->size);
+    polymer_remove(p, a->c);
+    while (!polymer_done_processing(p)) {
+        if (polymer_test(p)) {
+            polymer_destroy(p);
+        }
+        polymer_update(p);
+    }
+    
+    return (void *)p->current_size;
 }
 
 int main(int argc, char *argv[])
@@ -169,23 +191,27 @@ int main(int argc, char *argv[])
     size_t best_size = polymer->current_size;
     polymer_free(polymer);
 
+#if 1
+    pthread_t threads[26];
+    struct args *args = calloc(26, sizeof(struct args));
     for (char c = 'A'; c <= 'Z'; ++c) {
-        polymer_t *p = polymer_create(buf, polymer_length);
-        polymer_remove(p, c);
-        while (!polymer_done_processing(p)) {
-            if (polymer_test(p)) {
-                polymer_destroy(p);
-            }
-            polymer_update(p);
-        }
-        //polymer_print(p);
-        size_t size = p->current_size;
-        if (size < best_size) {
-            best_size = size;
-        }
-
+        int i = c - 'A';
+        args[i].c = c;
+        args[i].buf = buf;
+        args[i].size = polymer_length;
+        pthread_create(&threads[i], NULL, find_size_thread, &args[i]);
     }
+    for (char c = 'A'; c <= 'Z'; ++c) {
+        int i = c - 'A';
+        size_t ret = 0;
+        pthread_join(threads[i], (void **)&ret);
+        if (ret < best_size) {
+            best_size = ret;
+        }
+    }
+
     printf("The new best size is %zu\n", best_size);
+#endif
     file_free(file);
 
     return 0;
